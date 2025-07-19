@@ -1,4 +1,4 @@
-# .readthedocs.yaml  – replace the whole file with this
+# .readthedocs.yaml
 version: 2
 
 build:
@@ -6,14 +6,12 @@ build:
   tools:
     python: "3.12"
 
-  # Everything below runs *inside* RTD’s virtual‑env
   commands:
-    # 1 install your private package
+    # 1.  install Sphinx + extensions *first*
+    - pip install -r docs/requirements.txt
+
+    # 2.  install your private package
     - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
-    # 2 run Sphinx and write straight to the directory RTD expects
-    - sphinx-build -b html docs/source $READTHEDOCS_OUTPUT/html
-
-python:
-  install:
-    - requirements: docs/requirements.txt   # Sphinx + extensions only
+    # 3.  run Sphinx directly through the interpreter
+    - python -m sphinx.cmd.build -b html docs/source $READTHEDOCS_OUTPUT/html
