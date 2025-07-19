@@ -1,0 +1,477 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>coexistence_simulator.antennas.antenna_element &mdash; Coexistence Simulator  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Coexistence Simulator
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Coexistence Simulator</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">coexistence_simulator.antennas.antenna_element</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for coexistence_simulator.antennas.antenna_element</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Single‑element antenna model.</span>
+
+<span class="sd">This module defines :class:`AntennaElement`, a lightweight wrapper around</span>
+<span class="sd">an Antenna Magus ``.pln`` file.  It stores the element radiation patterns</span>
+<span class="sd">as discrete horizontal and vertical cuts and exposes helpers for</span>
+<span class="sd">interpolation, gain queries, and simple visualizations.</span>
+
+<span class="sd">Key features:</span>
+<span class="sd">    * Automatic conversion of header gain values from dBd to dBi.</span>
+<span class="sd">    * Support for three interpolation methods when sampling the pattern</span>
+<span class="sd">      at arbitrary angles: HPI, Bilinear, and Exponential.</span>
+<span class="sd">    * Optional normalization by the element&#39;s peak gain.</span>
+<span class="sd">    * Convenience methods for setting the element location and plotting</span>
+<span class="sd">      gain cuts or full 3‑D patterns.</span>
+
+<span class="sd">All angles are specified in **degrees**; distances are **meters**.  The</span>
+<span class="sd">class performs no unit conversions for position values.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+
+<div class="viewcode-block" id="AntennaElement">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.antennas.html#coexistence_simulator.antennas.antenna_element.AntennaElement">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AntennaElement</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents one physical antenna element.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pln_file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an :class:`AntennaElement` from a ``.pln`` file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            pln_file_path: Path to the Antenna Magus ``.pln`` file that</span>
+<span class="sd">                describes the element radiation pattern.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">frequency</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gain_dBi</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Stores header gain in dBi regardless of original unit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comment</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tilt</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_horizontal</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_vertical</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_gain</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># in Meters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">height</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bearing</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># in Degrees</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_parse_pln_file</span><span class="p">(</span><span class="n">pln_file_path</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_pln_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate pattern tables from a ``.pln`` file.</span>
+
+<span class="sd">        The method handles optional conversion from **dBd** to **dBi** by</span>
+<span class="sd">        adding 2.15 dB where required.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            file_path: Path to the ``.pln`` file produced by Antenna</span>
+<span class="sd">                Magus.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">mode</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">gain_conversion_needed</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="kc">False</span>  <span class="c1"># Flag to track if we need to convert gain values</span>
+        <span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">:</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">parts</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">key</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;FREQUENCY&quot;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">frequency</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;GAIN&quot;</span><span class="p">:</span>
+                    <span class="n">gain_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="s2">&quot;dBd&quot;</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span>
+                        <span class="n">gain_value</span> <span class="o">+=</span> <span class="mf">2.15</span>  <span class="c1"># Convert dBd to dBi for the header gain</span>
+                        <span class="n">gain_conversion_needed</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">gain_dBi</span> <span class="o">=</span> <span class="n">gain_value</span>
+                <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;COMMENT&quot;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">comment</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;TILT&quot;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">tilt</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;HORIZONTAL&quot;</span><span class="p">:</span>
+                    <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;horizontal&quot;</span>
+                <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;VERTICAL&quot;</span><span class="p">:</span>
+                    <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;vertical&quot;</span>
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_float</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                    <span class="n">angle</span><span class="p">,</span> <span class="n">gain</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">parts</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">gain_conversion_needed</span><span class="p">:</span>
+                        <span class="n">gain</span> <span class="o">+=</span> <span class="p">(</span>
+                            <span class="mf">2.15</span>  <span class="c1"># Convert dBd to dBi for angular gain values if needed</span>
+                        <span class="p">)</span>
+                    <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;horizontal&quot;</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_horizontal</span><span class="p">[</span><span class="n">angle</span><span class="p">]</span> <span class="o">=</span> <span class="n">gain</span>
+                    <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;vertical&quot;</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_vertical</span><span class="p">[</span><span class="n">angle</span><span class="p">]</span> <span class="o">=</span> <span class="n">gain</span>
+
+        <span class="c1"># Calculate the maximum gain value for normalization</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_gain</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_horizontal</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+            <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_vertical</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_float</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return **True** if *value* can be parsed as a float.&quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_interpolate_gain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">horizontal_angle</span><span class="p">,</span> <span class="n">vertical_angle</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;HPI&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the gain for an arbitrary orientation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            horizontal_angle: Horizontal (azimuth) angle in degrees.</span>
+<span class="sd">            vertical_angle: Vertical (elevation) angle in degrees.</span>
+<span class="sd">            method: Interpolation method. One of ``&quot;HPI&quot;`` (default),</span>
+<span class="sd">                ``&quot;Bilinear&quot;``, or ``&quot;Exponential&quot;``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Gain in dBi.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If *method* is not recognized.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Convert angles to radians for trigonometric calculations</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">horizontal_angle</span><span class="p">)</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">vertical_angle</span><span class="p">)</span>
+
+        <span class="c1"># Extract horizontal and vertical gain patterns</span>
+        <span class="n">horiz_angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_horizontal</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+        <span class="n">horiz_gains</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_horizontal</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+        <span class="n">vert_angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_vertical</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+        <span class="n">vert_gains</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_vertical</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;HPI&quot;</span><span class="p">:</span>
+            <span class="c1"># HPI Algorithm</span>
+            <span class="n">horiz_idx_1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">horiz_angles</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">phi</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">horiz_idx_2</span> <span class="o">=</span> <span class="n">horiz_idx_1</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="n">horiz_idx_1</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">horiz_idx_1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">horiz_idx_2</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">horiz_idx_2</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">horiz_angles</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="n">horiz_diff</span> <span class="o">=</span> <span class="n">horiz_angles</span><span class="p">[</span><span class="n">horiz_idx_2</span><span class="p">]</span> <span class="o">-</span> <span class="n">horiz_angles</span><span class="p">[</span><span class="n">horiz_idx_1</span><span class="p">]</span>
+            <span class="n">horiz_weight</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">-</span> <span class="n">horiz_angles</span><span class="p">[</span><span class="n">horiz_idx_1</span><span class="p">])</span> <span class="o">/</span> <span class="n">horiz_diff</span>
+                <span class="k">if</span> <span class="n">horiz_diff</span> <span class="o">!=</span> <span class="mi">0</span>
+                <span class="k">else</span> <span class="mi">0</span>
+            <span class="p">)</span>
+
+            <span class="n">GH_phi</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">horiz_gains</span><span class="p">[</span><span class="n">horiz_idx_1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">horiz_weight</span><span class="p">)</span>
+                <span class="o">+</span> <span class="n">horiz_gains</span><span class="p">[</span><span class="n">horiz_idx_2</span><span class="p">]</span> <span class="o">*</span> <span class="n">horiz_weight</span>
+            <span class="p">)</span>
+
+            <span class="n">GH_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">horiz_angles</span><span class="p">,</span> <span class="n">horiz_gains</span><span class="p">)</span>
+            <span class="n">GH_pi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="n">horiz_angles</span><span class="p">,</span> <span class="n">horiz_gains</span><span class="p">)</span>
+
+            <span class="n">vert_idx_1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">vert_angles</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">vert_idx_2</span> <span class="o">=</span> <span class="n">vert_idx_1</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="n">vert_idx_1</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">vert_idx_1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">vert_idx_2</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">vert_idx_2</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">vert_angles</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="n">vert_diff</span> <span class="o">=</span> <span class="n">vert_angles</span><span class="p">[</span><span class="n">vert_idx_2</span><span class="p">]</span> <span class="o">-</span> <span class="n">vert_angles</span><span class="p">[</span><span class="n">vert_idx_1</span><span class="p">]</span>
+            <span class="n">vert_weight</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">-</span> <span class="n">vert_angles</span><span class="p">[</span><span class="n">vert_idx_1</span><span class="p">])</span> <span class="o">/</span> <span class="n">vert_diff</span>
+                <span class="k">if</span> <span class="n">vert_diff</span> <span class="o">!=</span> <span class="mi">0</span>
+                <span class="k">else</span> <span class="mi">0</span>
+            <span class="p">)</span>
+
+            <span class="n">GV_theta</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">vert_gains</span><span class="p">[</span><span class="n">vert_idx_1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">vert_weight</span><span class="p">)</span>
+                <span class="o">+</span> <span class="n">vert_gains</span><span class="p">[</span><span class="n">vert_idx_2</span><span class="p">]</span> <span class="o">*</span> <span class="n">vert_weight</span>
+            <span class="p">)</span>
+            <span class="n">GV_pi_minus_theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span>
+                <span class="mi">180</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">),</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span>
+            <span class="p">)</span>
+
+            <span class="n">gain</span> <span class="o">=</span> <span class="n">GH_phi</span> <span class="o">-</span> <span class="p">(</span>
+                <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">-</span> <span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">GH_0</span> <span class="o">-</span> <span class="n">GV_theta</span><span class="p">)</span>
+                <span class="o">+</span> <span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">GH_pi</span> <span class="o">-</span> <span class="n">GV_pi_minus_theta</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;Bilinear&quot;</span><span class="p">:</span>
+            <span class="c1"># Bilinear Interpolation</span>
+            <span class="n">GH_phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">phi</span><span class="p">),</span> <span class="n">horiz_angles</span><span class="p">,</span> <span class="n">horiz_gains</span><span class="p">)</span>
+            <span class="n">GV_theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">),</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span><span class="p">)</span>
+            <span class="n">GV_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span><span class="p">)</span>
+            <span class="n">GV_2pi_minus_theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span>
+                <span class="mi">360</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">),</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span>
+            <span class="p">)</span>
+
+            <span class="n">gain</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">*</span> <span class="n">GV_2pi_minus_theta</span>
+                <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">-</span> <span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">))</span> <span class="o">*</span> <span class="n">GV_theta</span>
+                <span class="o">+</span> <span class="n">theta</span> <span class="o">*</span> <span class="n">GH_phi</span>
+                <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="n">GV_0</span>
+            <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">-</span> <span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">))</span> <span class="o">+</span> <span class="n">theta</span> <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">theta</span><span class="p">))</span>
+
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;Exponential&quot;</span><span class="p">:</span>
+            <span class="c1"># Exponential Interpolation</span>
+            <span class="n">GV_theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">),</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span><span class="p">)</span>
+            <span class="n">GV_theta_prime</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="mi">360</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">),</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span><span class="p">)</span>
+            <span class="n">GV_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">vert_gains</span><span class="p">)</span>
+
+            <span class="n">GH_phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">phi</span><span class="p">),</span> <span class="n">horiz_angles</span><span class="p">,</span> <span class="n">horiz_gains</span><span class="p">)</span>
+            <span class="n">GV_90</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="mi">90</span><span class="p">,</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span><span class="p">)</span>
+            <span class="n">GV_270</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="mi">270</span><span class="p">,</span> <span class="n">vert_angles</span><span class="p">,</span> <span class="n">vert_gains</span><span class="p">)</span>
+
+            <span class="c1"># Avoid divide-by-zero by checking if GV_270 - GV_90 is zero</span>
+            <span class="n">delta_gv</span> <span class="o">=</span> <span class="n">GV_270</span> <span class="o">-</span> <span class="n">GV_90</span>
+            <span class="k">if</span> <span class="n">delta_gv</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">correction_term</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">correction_term</span> <span class="o">=</span> <span class="p">(</span><span class="n">GV_theta_prime</span> <span class="o">-</span> <span class="n">GV_theta</span><span class="p">)</span> <span class="o">/</span> <span class="n">delta_gv</span>
+
+            <span class="n">gain</span> <span class="o">=</span> <span class="n">GV_theta</span> <span class="o">+</span> <span class="n">correction_term</span> <span class="o">*</span> <span class="p">(</span><span class="n">GH_phi</span> <span class="o">-</span> <span class="n">GV_max</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown interpolation method&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">gain</span>
+
+<div class="viewcode-block" id="AntennaElement.get_gain_at_angle">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.antennas.html#coexistence_simulator.antennas.antenna_element.AntennaElement.get_gain_at_angle">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_gain_at_angle</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">horizontal_angle</span><span class="p">,</span> <span class="n">vertical_angle</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;HPI&quot;</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convenience wrapper around :meth:`_interpolate_gain`.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            horizontal_angle: Horizontal angle in degrees.</span>
+<span class="sd">            vertical_angle: Vertical angle in degrees.</span>
+<span class="sd">            normalize: If **True**, divide by :pyattr:`max_gain`.</span>
+<span class="sd">            method: Interpolation method forwarded to</span>
+<span class="sd">                :meth:`_interpolate_gain`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Gain value in dBi (normalized if requested).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">gain</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interpolate_gain</span><span class="p">(</span><span class="n">horizontal_angle</span><span class="p">,</span> <span class="n">vertical_angle</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">normalize</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_gain</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">gain</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_gain</span>
+        <span class="k">return</span> <span class="n">gain</span></div>
+
+
+<div class="viewcode-block" id="AntennaElement.set_location">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.antennas.html#coexistence_simulator.antennas.antenna_element.AntennaElement.set_location">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_location</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">latitude</span><span class="p">,</span> <span class="n">longitude</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">bearing</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Store the physical location and orientation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            latitude: North–south coordinate in meters.</span>
+<span class="sd">            longitude: East–west coordinate in meters.</span>
+<span class="sd">            height: Antenna height in meters.</span>
+<span class="sd">            bearing: Bearing angle in degrees.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">latitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">longitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">height</span> <span class="o">=</span> <span class="n">height</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bearing</span> <span class="o">=</span> <span class="n">bearing</span></div>
+
+
+<div class="viewcode-block" id="AntennaElement.get_location">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.antennas.html#coexistence_simulator.antennas.antenna_element.AntennaElement.get_location">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_location</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the stored latitude, longitude, height, and bearing.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">height</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bearing</span></div>
+
+
+<div class="viewcode-block" id="AntennaElement.plot_gain_cut">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.antennas.html#coexistence_simulator.antennas.antenna_element.AntennaElement.plot_gain_cut">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plot_gain_cut</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">cut</span><span class="o">=</span><span class="s2">&quot;horizontal&quot;</span><span class="p">,</span> <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;polar&quot;</span><span class="p">,</span> <span class="n">interpolate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;HPI&quot;</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot a two‑dimensional gain cut.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            cutoff: Either ``&quot;horizontal&quot;`` or ``&quot;vertical&quot;``.</span>
+<span class="sd">            plot_type: ``&quot;polar&quot;`` or ``&quot;cartesian&quot;`` axes.</span>
+<span class="sd">            interpolate: If **True**, sample the pattern at 1‑degree</span>
+<span class="sd">                resolution using *method*.</span>
+<span class="sd">            method: Interpolation method passed on to</span>
+<span class="sd">                :meth:`_interpolate_gain` when *interpolate* is **True**.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If *cutoff* is not a recognized option.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">cut</span> <span class="o">==</span> <span class="s2">&quot;horizontal&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">interpolate</span><span class="p">:</span>
+                <span class="n">angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">361</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">gains</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_interpolate_gain</span><span class="p">(</span><span class="n">angle</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span> <span class="k">for</span> <span class="n">angle</span> <span class="ow">in</span> <span class="n">angles</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">angles</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_horizontal</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                <span class="n">gains</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_horizontal</span><span class="p">[</span><span class="n">angle</span><span class="p">]</span> <span class="k">for</span> <span class="n">angle</span> <span class="ow">in</span> <span class="n">angles</span><span class="p">]</span>
+            <span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Horizontal Gain Pattern&quot;</span>
+        <span class="k">elif</span> <span class="n">cut</span> <span class="o">==</span> <span class="s2">&quot;vertical&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">interpolate</span><span class="p">:</span>
+                <span class="n">angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">361</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">gains</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_interpolate_gain</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span> <span class="k">for</span> <span class="n">angle</span> <span class="ow">in</span> <span class="n">angles</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">angles</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_vertical</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                <span class="n">gains</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">gain_pattern_vertical</span><span class="p">[</span><span class="n">angle</span><span class="p">]</span> <span class="k">for</span> <span class="n">angle</span> <span class="ow">in</span> <span class="n">angles</span><span class="p">]</span>
+            <span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Vertical Gain Pattern&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;cut must be &#39;horizontal&#39; or &#39;vertical&#39;&quot;</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">plot_type</span> <span class="o">==</span> <span class="s2">&quot;polar&quot;</span><span class="p">:</span>
+            <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s2">&quot;polar&quot;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">angles</span><span class="p">),</span> <span class="n">gains</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+
+            <span class="c1"># Adjust the limits</span>
+            <span class="n">ymin</span><span class="p">,</span> <span class="n">ymax</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_ylim</span><span class="p">()</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="n">ymin</span><span class="p">,</span> <span class="n">ymax</span> <span class="o">+</span> <span class="p">(</span><span class="n">ymax</span> <span class="o">-</span> <span class="n">ymin</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">angles</span><span class="p">,</span> <span class="n">gains</span><span class="p">)</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Angle (degrees)&quot;</span><span class="p">)</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Gain (dBi)&quot;</span><span class="p">)</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AntennaElement.plot_gain_pattern">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.antennas.html#coexistence_simulator.antennas.antenna_element.AntennaElement.plot_gain_pattern">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plot_gain_pattern</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;HPI&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Render a 3D gain pattern over theta and phi angles.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            normalize: Whether to normalize by ``self.max_gain``.</span>
+<span class="sd">            method: Interpolation method used when sampling gain values.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">361</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">181</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">theta</span><span class="p">,</span> <span class="n">phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span>
+
+        <span class="c1"># Convert degrees to radians for the plot</span>
+        <span class="n">theta_rad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+        <span class="n">phi_rad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span>
+
+        <span class="c1"># Calculate the gain for each pair of theta and phi</span>
+        <span class="n">gain</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="n">gain</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_gain_at_angle</span><span class="p">(</span>
+                    <span class="n">theta</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span> <span class="n">phi</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span> <span class="n">normalize</span><span class="o">=</span><span class="n">normalize</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span>
+                <span class="p">)</span>
+
+        <span class="c1"># Create a 3D plot</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s2">&quot;3d&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Spherical to Cartesian conversion</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">gain</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">phi_rad</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">gain</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">phi_rad</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">gain</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">phi_rad</span><span class="p">)</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot_surface</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">)</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;3D Antenna Gain Pattern&quot;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;X&quot;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Y&quot;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_zlabel</span><span class="p">(</span><span class="s2">&quot;Z&quot;</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen Itschner.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

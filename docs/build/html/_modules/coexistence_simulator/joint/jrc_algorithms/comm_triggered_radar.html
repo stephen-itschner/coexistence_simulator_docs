@@ -1,0 +1,197 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>coexistence_simulator.joint.jrc_algorithms.comm_triggered_radar &mdash; Coexistence Simulator  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Coexistence Simulator
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Coexistence Simulator</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">coexistence_simulator.joint.jrc_algorithms.comm_triggered_radar</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for coexistence_simulator.joint.jrc_algorithms.comm_triggered_radar</h1><div class="highlight"><pre>
+<span></span><span class="c1"># joint/jrc_algorithms/comm_triggered_radar.py</span>
+<span class="sd">&quot;&quot;&quot;Opportunistic radar‑burst scheduler.</span>
+
+<span class="sd">`CommTriggeredRadar` fronts two waveform generators:</span>
+
+<span class="sd">* A *communications* modulator (for example, an OFDM or single‑carrier PHY).</span>
+<span class="sd">* A *radar* waveform block (for example, a chirp modulator or Golay pulse).</span>
+
+<span class="sd">Operation</span>
+<span class="sd">---------</span>
+<span class="sd">1. Application code enqueues downlink payloads with</span>
+<span class="sd">   `queue_bits(bits)`.</span>
+<span class="sd">2. Each call to `next_tx_frame()` checks the queue. If any bits are</span>
+<span class="sd">   waiting, one payload is removed and passed to the communications</span>
+<span class="sd">   modulator. Otherwise, a radar burst is requested.</span>
+
+<span class="sd">This rule lets a single RF front end time‑share between data and sensing</span>
+<span class="sd">without tight coupling to higher‑layer MAC logic.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;CommTriggeredRadar&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="CommTriggeredRadar">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.joint.jrc_algorithms.html#coexistence_simulator.joint.jrc_algorithms.comm_triggered_radar.CommTriggeredRadar">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CommTriggeredRadar</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Schedule radar bursts only when no communications payload is waiting.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">comm_block</span><span class="p">,</span> <span class="n">radar_block</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a controller for two baseband waveform blocks.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            comm_block: Object that exposes</span>
+<span class="sd">                `process(bits, operation=&quot;modulate&quot;)` and returns a one‑</span>
+<span class="sd">                dimensional complex NumPy array that represents a</span>
+<span class="sd">                communications frame.</span>
+<span class="sd">            radar_block: Object that exposes either</span>
+<span class="sd">                `process(operation=&quot;modulate&quot;)` or plain `process()`. The</span>
+<span class="sd">                call returns a one‑dimensional complex NumPy array that</span>
+<span class="sd">                represents one radar burst.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">comm_block</span> <span class="o">=</span> <span class="n">comm_block</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">radar_block</span> <span class="o">=</span> <span class="n">radar_block</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bit_queue</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_action</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># &quot;comm&quot; | &quot;radar&quot;</span>
+
+<div class="viewcode-block" id="CommTriggeredRadar.queue_bits">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.joint.jrc_algorithms.html#coexistence_simulator.joint.jrc_algorithms.comm_triggered_radar.CommTriggeredRadar.queue_bits">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">queue_bits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bits</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Append a communications payload for future transmission.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            bits: One‑dimensional `uint8` array of raw information bits.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bit_queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bits</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CommTriggeredRadar.next_tx_frame">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.joint.jrc_algorithms.html#coexistence_simulator.joint.jrc_algorithms.comm_triggered_radar.CommTriggeredRadar.next_tx_frame">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">next_tx_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the next baseband frame.</span>
+
+<span class="sd">        If queued bits exist, a communications frame is returned;</span>
+<span class="sd">        otherwise a radar burst is produced.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            One‑dimensional complex NumPy array containing the selected</span>
+<span class="sd">            frame.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bit_queue</span><span class="p">:</span>
+            <span class="n">bits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bit_queue</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">comm_block</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">bits</span><span class="p">,</span> <span class="n">operation</span><span class="o">=</span><span class="s2">&quot;modulate&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_action</span> <span class="o">=</span> <span class="s2">&quot;comm&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Some radar blocks require no args; others need operation kw.</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">radar_block</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">operation</span><span class="o">=</span><span class="s2">&quot;modulate&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">radar_block</span><span class="o">.</span><span class="n">process</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_action</span> <span class="o">=</span> <span class="s2">&quot;radar&quot;</span>
+        <span class="k">return</span> <span class="n">frame</span></div>
+
+
+<div class="viewcode-block" id="CommTriggeredRadar.queue_depth">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.joint.jrc_algorithms.html#coexistence_simulator.joint.jrc_algorithms.comm_triggered_radar.CommTriggeredRadar.queue_depth">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">queue_depth</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of pending communications payloads.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_bit_queue</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen Itschner.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

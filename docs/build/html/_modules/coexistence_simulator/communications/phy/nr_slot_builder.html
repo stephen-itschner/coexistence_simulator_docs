@@ -1,0 +1,271 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>coexistence_simulator.communications.phy.nr_slot_builder &mdash; Coexistence Simulator  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Coexistence Simulator
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Coexistence Simulator</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">coexistence_simulator.communications.phy.nr_slot_builder</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for coexistence_simulator.communications.phy.nr_slot_builder</h1><div class="highlight"><pre>
+<span></span><span class="c1"># communications/phy/nr_slot_builder.py</span>
+<span class="sd">&quot;&quot;&quot;Minimal 5G-NR OFDM slot builder.</span>
+
+<span class="sd">This helper creates one downlink slot (14 OFDM symbols) for a given</span>
+<span class="sd">numerology.  It is intentionally lightweight: no PDCCH/DMRS mapping or</span>
+<span class="sd">LDPC coding-just a random payload grid plus an optional DM-RS symbol for</span>
+<span class="sd">simple channel estimation in simulations.</span>
+
+<span class="sd">Usage example</span>
+<span class="sd">-------------</span>
+<span class="sd">```python</span>
+<span class="sd">from coexistence_simulator.communications.phy.nr_slot_builder import (</span>
+<span class="sd">    NRNumerology, NRSlotBuilder,</span>
+<span class="sd">)</span>
+<span class="sd">num = NRNumerology(mu=1)                 # 30-kHz SCS @ 15*2^mu kHz</span>
+<span class="sd">builder = NRSlotBuilder(num)</span>
+<span class="sd">tx_bb, bits, grid, ofdm_blk = builder.build_slot(mod_scheme=&quot;QPSK&quot;)</span>
+<span class="sd">```</span>
+
+<span class="sd">Extending this file</span>
+<span class="sd">-------------------</span>
+<span class="sd">* Add real DM-RS/PDCCH mapping rules per 38.211 if needed.</span>
+<span class="sd">* Insert LDPC encoder + rate-matching before modulation.</span>
+<span class="sd">* Support multiple antenna ports (build per-layer grids).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">coexistence_simulator.rf_system_blocks.blocks.modulation_block.ofdm_modulation_block</span><span class="w"> </span><span class="kn">import</span> \
+    <span class="n">OFDMModulation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">coexistence_simulator.rf_system_blocks.blocks.modulation_block.qpsk_modulation_block</span><span class="w"> </span><span class="kn">import</span> \
+    <span class="n">QPSKModulation</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;NRNumerology&quot;</span><span class="p">,</span> <span class="s2">&quot;NRSlotBuilder&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="NRNumerology">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.communications.phy.html#coexistence_simulator.communications.phy.nr_slot_builder.NRNumerology">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">NRNumerology</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Container for the parameters that define an NR numerology.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        mu: Numerology index (0 gives 15 kHz, 1 gives 30 kHz, and so on).</span>
+<span class="sd">        n_subcarriers: FFT size in sub‑carriers.</span>
+<span class="sd">        cp_fraction: Cyclic‑prefix length as a fraction of `n_subcarriers`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">mu</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">n_subcarriers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span>
+    <span class="n">cp_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.07</span>
+
+    <span class="c1"># existing helpers ...</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">subcarrier_spacing</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>  <span class="c1"># Deltaf</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Subcarrier spacing in hertz.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="mf">15e3</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">mu</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sampling_rate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>  <span class="c1"># fs</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sampling rate derived from the numerology.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_subcarriers</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">subcarrier_spacing</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cp_len</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>  <span class="c1"># samples</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Cyclic prefix length in samples.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cp_fraction</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_subcarriers</span><span class="p">))</span>
+
+    <span class="c1"># ---------- add these ----------</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">n_fft</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;FFT size (alias of n_subcarriers).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_subcarriers</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sym_len_s</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;OFDM symbol length including CP (seconds).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_fft</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">cp_len</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampling_rate</span></div>
+
+
+
+<div class="viewcode-block" id="NRSlotBuilder">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.communications.phy.html#coexistence_simulator.communications.phy.nr_slot_builder.NRSlotBuilder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NRSlotBuilder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create one slot of baseband samples for a single antenna.</span>
+
+<span class="sd">    A *slot* in NR with a normal cyclic prefix always contains 14 OFDM</span>
+<span class="sd">    symbols.  This helper fills the resource grid with random QPSK symbols</span>
+<span class="sd">    and, optionally, inserts a BPSK DM‑RS pattern into symbol index 1.</span>
+
+<span class="sd">    The builder is intentionally narrow in scope so that simulations start</span>
+<span class="sd">    fast.  For production‑grade work you would need:</span>
+
+<span class="sd">    * PDCCH and data channel mapping per TS 38.211.</span>
+<span class="sd">    * LDPC coding and rate matching.</span>
+<span class="sd">    * Multiple antenna ports.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">NUM_SYM</span> <span class="o">=</span> <span class="mi">14</span>  <span class="c1"># NR normal CP slot</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">numerology</span><span class="p">:</span> <span class="n">NRNumerology</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the slot builder.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            numerology: The numerology that defines FFT size, CP length,</span>
+<span class="sd">                and sample rate.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">num</span> <span class="o">=</span> <span class="n">numerology</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ofdm</span> <span class="o">=</span> <span class="n">OFDMModulation</span><span class="p">(</span>
+            <span class="n">num_subcarriers</span><span class="o">=</span><span class="n">numerology</span><span class="o">.</span><span class="n">n_subcarriers</span><span class="p">,</span> <span class="n">cp_len</span><span class="o">=</span><span class="n">numerology</span><span class="o">.</span><span class="n">cp_len</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mod_qpsk</span> <span class="o">=</span> <span class="n">QPSKModulation</span><span class="p">()</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+<div class="viewcode-block" id="NRSlotBuilder.build_slot">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.communications.phy.html#coexistence_simulator.communications.phy.nr_slot_builder.NRSlotBuilder.build_slot">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_slot</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">mod_scheme</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;QPSK&quot;</span><span class="p">,</span>
+        <span class="n">insert_dmrs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">OFDMModulation</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate one NR downlink slot.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mod_scheme: Modulation scheme. Only &quot;QPSK&quot; is supported.</span>
+<span class="sd">            insert_dmrs: If *True*, overwrite symbol index 1 with a DM‑RS</span>
+<span class="sd">                pattern (BPSK with +1 phase on every sub‑carrier).</span>
+<span class="sd">            rng: Optional NumPy random generator used for payload bits.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: ``(tx_bb, bits, grid, ofdm_block)``</span>
+
+<span class="sd">            * **tx_bb** (``np.ndarray``): Time‑domain waveform of the slot.</span>
+<span class="sd">            * **bits** (``np.ndarray``): Source bits used to fill the grid.</span>
+<span class="sd">            * **grid** (``np.ndarray``): Frequency‑domain resource grid</span>
+<span class="sd">              shaped ``(14, n_subcarriers)``.</span>
+<span class="sd">            * **ofdm_block** (``OFDMModulation``): The OFDM modulator used.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: If *mod_scheme* is not &quot;QPSK&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">rng</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">()</span>
+
+        <span class="n">n_bits_per_sym</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># QPSK only for now</span>
+        <span class="n">n_bits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num</span><span class="o">.</span><span class="n">n_subcarriers</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">NUM_SYM</span> <span class="o">*</span> <span class="n">n_bits_per_sym</span>
+        <span class="n">bits</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">n_bits</span><span class="p">)</span>
+
+        <span class="c1"># Map bits to symbols</span>
+        <span class="k">if</span> <span class="n">mod_scheme</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;QPSK&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Only QPSK supported in this stub&quot;</span><span class="p">)</span>
+        <span class="n">symbols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mod_qpsk</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">bits</span><span class="p">,</span> <span class="n">operation</span><span class="o">=</span><span class="s2">&quot;modulate&quot;</span><span class="p">)</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">symbols</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NUM_SYM</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num</span><span class="o">.</span><span class="n">n_subcarriers</span><span class="p">)</span>
+
+        <span class="c1"># optional: overwrite symbol 2 with DMRS (BPSK all +1)</span>
+        <span class="k">if</span> <span class="n">insert_dmrs</span><span class="p">:</span>
+            <span class="n">dmrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num</span><span class="o">.</span><span class="n">n_subcarriers</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+            <span class="n">grid</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">dmrs</span>
+
+        <span class="n">td_syms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ofdm</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">operation</span><span class="o">=</span><span class="s2">&quot;modulate&quot;</span><span class="p">)</span>  <span class="c1"># (14, Nfft+cp)</span>
+        <span class="n">tx_bb</span> <span class="o">=</span> <span class="n">td_syms</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">tx_bb</span><span class="p">,</span> <span class="n">bits</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ofdm</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen Itschner.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

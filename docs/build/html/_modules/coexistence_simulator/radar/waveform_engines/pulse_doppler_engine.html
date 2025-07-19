@@ -1,0 +1,214 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>coexistence_simulator.radar.waveform_engines.pulse_doppler_engine &mdash; Coexistence Simulator  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Coexistence Simulator
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Coexistence Simulator</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">coexistence_simulator.radar.waveform_engines.pulse_doppler_engine</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for coexistence_simulator.radar.waveform_engines.pulse_doppler_engine</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Pulse‑Doppler burst engine.</span>
+
+<span class="sd">The class synthesizes rectangular RF pulses at a fixed pulse‑repetition</span>
+<span class="sd">frequency (PRF) and provides a matched‑filter receive path. Only NumPy is</span>
+<span class="sd">required; no external DSP libraries are used.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PulseDopplerEngine&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="PulseDopplerEngine">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.radar.waveform_engines.html#coexistence_simulator.radar.waveform_engines.pulse_doppler_engine.PulseDopplerEngine">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PulseDopplerEngine</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lightweight rectangular‑pulse generator and matched filter.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pw: Pulse width in seconds.</span>
+<span class="sd">        prf: Pulse‑repetition frequency in hertz.</span>
+<span class="sd">        fs: ADC/DAC sample rate in hertz.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If any argument is non‑positive or if the pulse</span>
+<span class="sd">            contains fewer than four samples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pw</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">prf</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">fs</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">pw</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">prf</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">fs</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;pw, prf and fs must be positive&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pw</span> <span class="o">=</span> <span class="n">pw</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prf</span> <span class="o">=</span> <span class="n">prf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="n">fs</span>
+
+        <span class="n">samples_per_pulse</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">pw</span> <span class="o">*</span> <span class="n">fs</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">samples_per_pulse</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;pulse must contain at least 4 samples&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_samp_pulse</span> <span class="o">=</span> <span class="n">samples_per_pulse</span>
+
+        <span class="c1"># Pre-compute one baseband rectangular pulse (complex 1+0j)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tx_pulse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_samp_pulse</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+
+        <span class="c1"># Time between pulse starts, expressed in samples</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_samp_cpi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">fs</span> <span class="o">/</span> <span class="n">prf</span><span class="p">))</span>
+
+    <span class="c1"># ------------------------------------------ TX</span>
+<div class="viewcode-block" id="PulseDopplerEngine.synth_burst">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.radar.waveform_engines.html#coexistence_simulator.radar.waveform_engines.pulse_doppler_engine.PulseDopplerEngine.synth_burst">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">synth_burst</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_pulses</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate a burst of **n_pulses** rectangular pulses.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            n_pulses: Number of pulses to synthesize; must be positive.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Complex NumPy array of shape ``(n_pulses, n_samp_cpi)`` where</span>
+<span class="sd">            each row contains one pulse followed by zeros.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If *n_pulses* is not positive.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">n_pulses</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;n_pulses must be positive&quot;</span><span class="p">)</span>
+
+        <span class="n">burst</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_pulses</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_samp_cpi</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+        <span class="n">burst</span><span class="p">[:,</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_samp_pulse</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tx_pulse</span>
+        <span class="k">return</span> <span class="n">burst</span></div>
+
+
+    <span class="c1"># ------------------------------------------ RX</span>
+<div class="viewcode-block" id="PulseDopplerEngine.match_filter">
+<a class="viewcode-back" href="../../../../api/coexistence_simulator.radar.waveform_engines.html#coexistence_simulator.radar.waveform_engines.pulse_doppler_engine.PulseDopplerEngine.match_filter">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">match_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rx</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply a matched filter to each received pulse.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            rx: Complex NumPy array with shape</span>
+<span class="sd">                ``(n_pulses, n_samp_cpi)``—one PRI per row.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Complex NumPy array of the same shape as *rx* that contains</span>
+<span class="sd">            the valid‑length convolution result for each pulse.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If *rx* is not two‑dimensional or the fast‑time</span>
+<span class="sd">                dimension differs from ``n_samp_cpi``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">rx</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">rx</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_samp_cpi</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;rx must be 2-D with shape (n_pulses, n_samp_cpi)&quot;</span><span class="p">)</span>
+        <span class="n">filt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">conjugate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tx_pulse</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># time-reversed</span>
+        <span class="c1"># FFT convolution for efficiency on longer records</span>
+        <span class="n">n_fft</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_samp_cpi</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_samp_pulse</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+        <span class="n">pulse_fft</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">filt</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">rx</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rx</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">tmp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">rx</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">n_fft</span><span class="p">)</span> <span class="o">*</span> <span class="n">pulse_fft</span><span class="p">)[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_samp_cpi</span><span class="p">]</span>
+            <span class="n">out</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">tmp</span>
+        <span class="k">return</span> <span class="n">out</span></div>
+
+
+    <span class="c1"># ------------------------------------------ Helpers</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pri_s</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pulse-repetition interval in seconds.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">prf</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">duty_cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Transmit duty cycle (pw / PRI).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pw</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">prf</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen Itschner.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,255 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>coexistence_simulator.performance_metrics.performance_metrics &mdash; Coexistence Simulator  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Coexistence Simulator
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Coexistence Simulator</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">coexistence_simulator.performance_metrics.performance_metrics</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for coexistence_simulator.performance_metrics.performance_metrics</h1><div class="highlight"><pre>
+<span></span><span class="c1"># performance_metrics/performance_metrics.py</span>
+<span class="sd">&quot;&quot;&quot;Lightweight metrics for evaluating ISAC simulations.</span>
+
+<span class="sd">Only NumPy is required, so the helpers run quickly inside unit tests or</span>
+<span class="sd">resource‑constrained environments.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;bit_error_rate&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;packet_error_rate&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;range_rmse&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;spectral_utilization&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;snr_db&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="c1"># ----------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="bit_error_rate">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.performance_metrics.html#coexistence_simulator.performance_metrics.performance_metrics.bit_error_rate">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">bit_error_rate</span><span class="p">(</span><span class="n">tx_bits</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">rx_bits</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the bit‑error rate between two bit vectors.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tx_bits: Transmitted bits as a one‑dimensional ``uint8`` array.</span>
+<span class="sd">        rx_bits: Received bits, same shape and dtype as *tx_bits*.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Fraction of mismatched bits, in the range ``[0, 1]``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If *tx_bits* is empty or the arrays differ in shape.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">tx_bits</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;tx_bits is empty&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">tx_bits</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">rx_bits</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Arrays must have the same shape&quot;</span><span class="p">)</span>
+    <span class="n">errors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">tx_bits</span> <span class="o">!=</span> <span class="n">rx_bits</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">errors</span> <span class="o">/</span> <span class="n">tx_bits</span><span class="o">.</span><span class="n">size</span></div>
+
+
+
+<div class="viewcode-block" id="packet_error_rate">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.performance_metrics.html#coexistence_simulator.performance_metrics.performance_metrics.packet_error_rate">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">packet_error_rate</span><span class="p">(</span><span class="n">tx_ok_flags</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">rx_ok_flags</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the packet‑error rate from Boolean success flags.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tx_ok_flags: Ground‑truth per‑packet success flags.</span>
+<span class="sd">        rx_ok_flags: Decoder‑reported success flags, same shape.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Packet error rate, in the range ``[0, 1]``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the flag arrays differ in shape or are empty.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">tx_ok_flags</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">tx_ok_flags</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">rx_ok_flags</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rx_ok_flags</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">tx_ok_flags</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">rx_ok_flags</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Flag arrays must have same shape&quot;</span><span class="p">)</span>
+    <span class="n">n_tx</span> <span class="o">=</span> <span class="n">tx_ok_flags</span><span class="o">.</span><span class="n">size</span>
+    <span class="k">if</span> <span class="n">n_tx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No packets provided&quot;</span><span class="p">)</span>
+    <span class="n">errors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">tx_ok_flags</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">rx_ok_flags</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">errors</span> <span class="o">/</span> <span class="n">n_tx</span></div>
+
+
+
+<div class="viewcode-block" id="range_rmse">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.performance_metrics.html#coexistence_simulator.performance_metrics.performance_metrics.range_rmse">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">range_rmse</span><span class="p">(</span><span class="n">est_ranges</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">true_ranges</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the root‑mean‑square error of range estimates.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        est_ranges: Estimated ranges in meters.</span>
+<span class="sd">        true_ranges: Reference ranges in meters.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RMSE of the estimates, in meters.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the arrays cannot be aligned to the same shape.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">est_ranges</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">true_ranges</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="n">aligned</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">true_ranges</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">est_ranges</span><span class="o">.</span><span class="n">size</span><span class="p">:</span>
+                <span class="n">aligned</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">est_ranges</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">est_ranges</span> <span class="o">-</span> <span class="n">t</span><span class="p">))])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">aligned</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+        <span class="n">est_ranges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">aligned</span><span class="p">)</span>
+
+    <span class="n">est_ranges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">est_ranges</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">true_ranges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">true_ranges</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">est_ranges</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">true_ranges</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Shapes differ&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">est_ranges</span> <span class="o">-</span> <span class="n">true_ranges</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="spectral_utilization">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.performance_metrics.html#coexistence_simulator.performance_metrics.performance_metrics.spectral_utilization">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">spectral_utilization</span><span class="p">(</span><span class="n">occupied_bw_hz</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">total_bw_hz</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return fractional spectrum occupancy.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        occupied_bw_hz: Bandwidth actively used by the signal, in hertz.</span>
+<span class="sd">        total_bw_hz: Total channel bandwidth, in hertz.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Utilization ratio between ``0`` and ``1``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If *total_bw_hz* is not positive.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">total_bw_hz</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;total_bw_hz must be positive&quot;</span><span class="p">)</span>
+    <span class="n">occ</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">occupied_bw_hz</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">occ</span> <span class="o">/</span> <span class="n">total_bw_hz</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="snr_db">
+<a class="viewcode-back" href="../../../api/coexistence_simulator.performance_metrics.html#coexistence_simulator.performance_metrics.performance_metrics.snr_db">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">snr_db</span><span class="p">(</span><span class="n">signal</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">noise</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the signal‑to‑noise ratio in decibels.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        signal: Desired signal samples (any shape).</span>
+<span class="sd">        noise: Noise samples (any shape).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        SNR in dB; returns ``np.inf`` if the noise power is zero.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If either input is empty.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">signal</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">noise</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Empty input&quot;</span><span class="p">)</span>
+    <span class="c1"># Align length</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="n">noise</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">sig_pwr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">signal</span><span class="p">[:</span><span class="n">n</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">noise_pwr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">noise</span><span class="p">[:</span><span class="n">n</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">noise_pwr</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+    <span class="k">return</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">sig_pwr</span> <span class="o">/</span> <span class="n">noise_pwr</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen Itschner.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

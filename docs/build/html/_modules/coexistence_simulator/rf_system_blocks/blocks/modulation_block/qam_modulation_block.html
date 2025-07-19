@@ -1,0 +1,261 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>coexistence_simulator.rf_system_blocks.blocks.modulation_block.qam_modulation_block &mdash; Coexistence Simulator  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            Coexistence Simulator
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">Coexistence Simulator</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">coexistence_simulator.rf_system_blocks.blocks.modulation_block.qam_modulation_block</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for coexistence_simulator.rf_system_blocks.blocks.modulation_block.qam_modulation_block</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Quadrature amplitude‑modulation (QAM) mapper / slicer block.</span>
+
+<span class="sd">The block supports square constellations whose order is a perfect square</span>
+<span class="sd">(e.g. 16, 64, 256). It can modulate binary data into complex QAM symbols or</span>
+<span class="sd">demodulate symbols back to bits.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">coexistence_simulator.rf_system_blocks.blocks.base_block</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseBlock</span>
+
+
+<div class="viewcode-block" id="QAMModulation">
+<a class="viewcode-back" href="../../../../../api/coexistence_simulator.rf_system_blocks.blocks.modulation_block.html#coexistence_simulator.rf_system_blocks.blocks.modulation_block.qam_modulation_block.QAMModulation">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QAMModulation</span><span class="p">(</span><span class="n">BaseBlock</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Square‑QAM modulator and demodulator.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        order: Constellation size (must be 4, 16, 64, 256, …).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If *order* is not a perfect square.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">16</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">order</span> <span class="o">=</span> <span class="n">order</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">side_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">order</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">side_length</span><span class="o">**</span><span class="mi">2</span> <span class="o">!=</span> <span class="n">order</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;QAM order must be a perfect square.&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="QAMModulation.process">
+<a class="viewcode-back" href="../../../../../api/coexistence_simulator.rf_system_blocks.blocks.modulation_block.html#coexistence_simulator.rf_system_blocks.blocks.modulation_block.qam_modulation_block.QAMModulation.process">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">operation</span><span class="o">=</span><span class="s2">&quot;modulate&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run QAM modulation or demodulation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: 1‑D NumPy array or list containing input bits</span>
+<span class="sd">                (for modulation) or QAM symbols (for demodulation).</span>
+<span class="sd">            operation: ``&quot;modulate&quot;`` or ``&quot;demodulate&quot;``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            * If modulating, returns a complex NumPy array of QAM symbols.</span>
+<span class="sd">            * If demodulating, returns a ``uint8`` array of bits.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If *operation* is invalid or the input length</span>
+<span class="sd">                does not match the constellation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;modulate&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_modulate</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;demodulate&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_demodulate</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Invalid operation specified. Use &#39;modulate&#39; or &#39;demodulate&#39;.&quot;</span>
+            <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_modulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Map groups of bits to complex QAM symbols.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            bits: 1‑D ``uint8`` array whose length is a multiple of</span>
+<span class="sd">                ``log2(order)``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Complex NumPy array of QAM symbols.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If *bits* length is not divisible by</span>
+<span class="sd">                ``log2(order)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">bits_per_symbol</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">%</span> <span class="n">bits_per_symbol</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Input data length must be a multiple of </span><span class="si">{</span><span class="n">bits_per_symbol</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="si">}</span><span class="s2">-QAM modulation.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Reshape input bits to group according to bits_per_symbol</span>
+        <span class="n">reshaped_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">bits_per_symbol</span><span class="p">)</span>
+
+        <span class="c1"># Convert bit groups to decimal to determine I and Q components</span>
+        <span class="n">symbols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">bits</span><span class="p">)),</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">bits</span> <span class="ow">in</span> <span class="n">reshaped_data</span><span class="p">])</span>
+        <span class="n">i_values</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">symbols</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">side_length</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">side_length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">q_values</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">symbols</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">side_length</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">side_length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">qam_signal</span> <span class="o">=</span> <span class="n">i_values</span> <span class="o">+</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">q_values</span>
+
+        <span class="k">return</span> <span class="n">qam_signal</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_demodulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qam_signal</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Slice QAM symbols back to binary data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            symbols: 1‑D complex NumPy array of QAM constellation points.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ``uint8`` array containing the recovered bits. The length is</span>
+<span class="sd">            ``len(symbols) * log2(order)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">qam_signal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">qam_signal</span><span class="p">)</span>
+        <span class="n">bits_per_symbol</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">))</span>
+
+        <span class="c1"># Determine I and Q components</span>
+        <span class="n">i_values</span> <span class="o">=</span> <span class="p">(</span><span class="n">qam_signal</span><span class="o">.</span><span class="n">real</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">side_length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">q_values</span> <span class="o">=</span> <span class="p">(</span><span class="n">qam_signal</span><span class="o">.</span><span class="n">imag</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">side_length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span>
+
+        <span class="c1"># Convert to symbols and then to bits</span>
+        <span class="n">symbols</span> <span class="o">=</span> <span class="p">(</span><span class="n">q_values</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">side_length</span> <span class="o">+</span> <span class="n">i_values</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">data_bits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+            <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">binary_repr</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">bits_per_symbol</span><span class="p">))</span> <span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="n">symbols</span><span class="p">],</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">data_bits</span>
+
+<div class="viewcode-block" id="QAMModulation.get_parameters">
+<a class="viewcode-back" href="../../../../../api/coexistence_simulator.rf_system_blocks.blocks.modulation_block.html#coexistence_simulator.rf_system_blocks.blocks.modulation_block.qam_modulation_block.QAMModulation.get_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a JSON‑serializable snapshot of the block state.</span>
+
+<span class="sd">        The dictionary can be stored in a config file and later passed to</span>
+<span class="sd">        :meth:`set_parameters` to re‑create an identical QAM block.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict: Keys are</span>
+
+<span class="sd">            * ``&quot;block_name&quot;`` – The user‑assigned label (string).</span>
+<span class="sd">            * ``&quot;order&quot;`` – Constellation size (int).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;block_name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">block_name</span><span class="p">,</span> <span class="s2">&quot;order&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="QAMModulation.set_parameters">
+<a class="viewcode-back" href="../../../../../api/coexistence_simulator.rf_system_blocks.blocks.modulation_block.html#coexistence_simulator.rf_system_blocks.blocks.modulation_block.qam_modulation_block.QAMModulation.set_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Configure the block from a parameter dictionary.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            parameters: Dictionary produced by :meth:`get_parameters`.</span>
+<span class="sd">                Supported keys:</span>
+
+<span class="sd">                * ``&quot;block_name&quot;`` (str): Optional new label.</span>
+<span class="sd">                * ``&quot;order&quot;`` (int): New QAM order. Must remain a perfect</span>
+<span class="sd">                  square; otherwise ``ValueError`` is raised.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``&quot;order&quot;`` is not a perfect square.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">block_name</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;block_name&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">block_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">order</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">side_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">side_length</span><span class="o">**</span><span class="mi">2</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;QAM order must be a perfect square.&quot;</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen Itschner.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
