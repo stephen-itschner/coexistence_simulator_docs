@@ -1,4 +1,3 @@
-cat > .readthedocs.yaml <<'YAML'
 version: 2
 build:
   os: ubuntu-22.04
