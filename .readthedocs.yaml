@@ -8,7 +8,7 @@ build:
   # Extra commands that run **after** the virtual‑env is created
   commands:
     # Install the private repo using the PAT you added to RTD’s env‑vars
-    - pip install "git+https://${GH_PAT}@github.com/itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
+    - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
 sphinx:
   configuration: docs/source/conf.py
