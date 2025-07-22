@@ -1,7 +1,6 @@
 version: 2
 
-# 📦 Set formats to produce
-formats:
+formats:        # make the “Download” menu appear
   - pdf
   - epub
   - htmlzip
@@ -11,28 +10,32 @@ build:
   tools:
     python: "3.12"
 
-  # Install system-level dependencies required for PDF builds
-  apt_packages:
+  apt_packages:           # XeLaTeX & friends
+    - texlive-xetex
     - texlive-latex-recommended
     - texlive-latex-extra
     - texlive-fonts-recommended
     - latexmk
 
   commands:
-    # 1️⃣ Install Python deps
+    # 1️⃣  Python deps
     - pip install -r docs/requirements.txt
 
-    # 2️⃣ Install private package
+    # 2️⃣  Private package (needs GH_PAT secret in RTD admin)
     - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
-    # 3️⃣ Build HTML output
-    - python -m sphinx.cmd.build -b html    docs/source $READTHEDOCS_OUTPUT/html
+    # 3️⃣  HTML
+    - python -m sphinx.cmd.build -b html docs/source $READTHEDOCS_OUTPUT/html
 
-    # 4️⃣ Build LaTeX and PDF
-    - python -m sphinx.cmd.build -b latex   docs/source $READTHEDOCS_OUTPUT/latex
-    - (cd $READTHEDOCS_OUTPUT/latex && latexmk -pdf)
+    # 4️⃣  LaTeX source with XeLaTeX engine
+    - python -m sphinx.cmd.build -b latex -D latex_engine=xelatex docs/source $READTHEDOCS_OUTPUT/latex
 
-    # 5️⃣ Build ePub and zipped HTML
+    # 5️⃣  PDF via latexmk + XeLaTeX
+    - |
+      cd $READTHEDOCS_OUTPUT/latex && \
+      latexmk -quiet -xelatex -f coexistencesimulator.tex
+
+    # 6️⃣  ePub & zipped‑HTML
     - python -m sphinx.cmd.build -b epub    docs/source $READTHEDOCS_OUTPUT/epub
     - python -m sphinx.cmd.build -b htmlzip docs/source $READTHEDOCS_OUTPUT/htmlzip
 
