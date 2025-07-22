@@ -1,41 +1,35 @@
-# .readthedocs.yaml  –  builds HTML + PDF + EPUB + HTML‑zip
+# .readthedocs.yaml ── streamlined for RTD
 version: 2
 
+# 1️⃣  Tell RTD which extra output formats you want
 formats:
-  - pdf
+  - pdf          # Sphinx → LaTeX → PDF (uses latexmk for you)
   - epub
   - htmlzip
 
+# 2️⃣  Build environment
 build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
 
-  apt_packages:        # only the basics; we no longer need full xindy support
+  # LaTeX needs XeTeX and latexmk; everything else comes with RTD’s base image
+  apt_packages:
     - texlive-xetex
-    - texlive-latex-recommended
-    - texlive-latex-extra
-    - texlive-fonts-recommended
-    - latexmk            # still needed for the manual PDF pass
+    - latexmk
 
-  commands:
-    # 1️⃣  Python deps
-    - pip install -r docs/requirements.txt
-    # 2️⃣  Private package
-    - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
+# 3️⃣  Python dependencies (RTD will run these for you)
+python:
+  install:
+    # project itself (the repo being built):
+    - method: pip
+      path: .
+    # requirements the docs need:
+    - requirements: docs/requirements.txt
+    # private GitHub package (make sure GH_PAT is set in RTD → Admin → Environment Variables)
+    - method: pip
+      path: "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
-    # 3️⃣  Build HTML
-    - python -m sphinx -b html docs/source $READTHEDOCS_OUTPUT/html
-
-    # 4️⃣  Build LaTeX sources **without xindy**
-    - python -m sphinx -b latex -D latex_engine=xelatex -D latex_use_xindy=0 docs/source $READTHEDOCS_OUTPUT/latex
-
-    # 5️⃣  Turn LaTeX into PDF
-    - cd $READTHEDOCS_OUTPUT/latex && latexmk -quiet -xelatex -f coexistencesimulator.tex
-
-    # 6️⃣  Build EPUB & zipped‑HTML
-    - python -m sphinx -b epub    docs/source $READTHEDOCS_OUTPUT/epub
-    - python -m sphinx -b htmlzip docs/source $READTHEDOCS_OUTPUT/htmlzip
-
+# 4️⃣  Sphinx entry‑point
 sphinx:
   configuration: docs/source/conf.py
