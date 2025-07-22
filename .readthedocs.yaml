@@ -1,6 +1,6 @@
 version: 2
 
-# ✅ Enable offline formats
+# 📦 Set formats to produce
 formats:
   - pdf
   - epub
@@ -11,14 +11,30 @@ build:
   tools:
     python: "3.12"
 
-  commands:
-    # 1️⃣ Install Sphinx + extensions
-    - pip install -r docs/requirements.txt
-    # 2️⃣ Install the private package
-    - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
-    # 3️⃣ Build HTML
-    - python -m sphinx.cmd.build -b html docs/source $READTHEDOCS_OUTPUT/html
+  # Install system-level dependencies required for PDF builds
+  apt_packages:
+    - texlive-latex-recommended
+    - texlive-latex-extra
+    - texlive-fonts-recommended
+    - latexmk
 
-# Specify Sphinx configuration explicitly
+  commands:
+    # 1️⃣ Install Python deps
+    - pip install -r docs/requirements.txt
+
+    # 2️⃣ Install private package
+    - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
+
+    # 3️⃣ Build HTML output
+    - python -m sphinx.cmd.build -b html    docs/source $READTHEDOCS_OUTPUT/html
+
+    # 4️⃣ Build LaTeX and PDF
+    - python -m sphinx.cmd.build -b latex   docs/source $READTHEDOCS_OUTPUT/latex
+    - (cd $READTHEDOCS_OUTPUT/latex && latexmk -pdf)
+
+    # 5️⃣ Build ePub and zipped HTML
+    - python -m sphinx.cmd.build -b epub    docs/source $READTHEDOCS_OUTPUT/epub
+    - python -m sphinx.cmd.build -b htmlzip docs/source $READTHEDOCS_OUTPUT/htmlzip
+
 sphinx:
   configuration: docs/source/conf.py
