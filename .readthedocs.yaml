@@ -1,32 +1,26 @@
-# .readthedocs.yaml — HTML, PDF, EPUB, HTML‑zip
+# .readthedocs.yaml  – builds HTML + PDF + EPUB + HTML‑zip
 version: 2
 
-formats:
-  - pdf
-  - epub
-  - htmlzip
+formats: [pdf, epub, htmlzip]
 
 build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
+  apt_packages:          # TeX for the PDF
+    - texlive-latex-recommended
+    - texlive-latex-extra
+    - texlive-fonts-recommended
+    - texlive-xetex
+    - latexmk             
 
-  # LaTeX + helper tools required for the PDF
-  apt_packages:
-    - texlive-latex-recommended      # core LaTeX packages
-    - texlive-latex-extra            # many Sphinx dependencies (tocbibind, etc.)
-    - texlive-fonts-recommended      # Latin Modern, DejaVu, etc.
-    - texlive-xetex                  # xelatex engine (unicode + modern fonts)
-    - latexmk                        # one‑shot PDF compiler that RTD relies on
-
-  commands:
-    # 1️⃣ Python dependencies for Sphinx and extensions
-    - pip install -r docs/requirements.txt
-    # 2️⃣ Install the private package so autodoc can import it
-    - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
-    # 3️⃣ Build the HTML shown on the site
-    - python -m sphinx.cmd.build -b html docs/source $READTHEDOCS_OUTPUT/html
-    # (No extra commands are needed for the PDF; RTD triggers its own LaTeX‑>PDF stage.)
+python:
+  install:
+    - requirements: docs/requirements.txt          # Sphinx + extensions
+    - method: pip                                  # your private package
+      path: .
+      extra_requirements: [docs]                   # or omit if unused
+      url: "https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main"
 
 sphinx:
   configuration: docs/source/conf.py
