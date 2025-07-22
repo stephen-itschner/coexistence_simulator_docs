@@ -1,18 +1,24 @@
 version: 2
 
+# ✅ Enable offline formats
+formats:
+  - pdf
+  - epub
+  - htmlzip
+
 build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
 
   commands:
-    # 1️⃣ install Sphinx + extensions
+    # 1️⃣ Install Sphinx + extensions
     - pip install -r docs/requirements.txt
-
-    # 2️⃣ install the private package
+    # 2️⃣ Install the private package
     - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
-
-    # 3️⃣ run Sphinx via the interpreter (avoids asdf shim issues)
+    # 3️⃣ Build HTML
     - python -m sphinx.cmd.build -b html docs/source $READTHEDOCS_OUTPUT/html
 
-# remove the python.install block — requirements are installed explicitly above
+# Specify Sphinx configuration explicitly
+sphinx:
+  configuration: docs/source/conf.py
