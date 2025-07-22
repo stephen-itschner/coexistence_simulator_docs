@@ -1,26 +1,21 @@
-# .readthedocs.yaml  – builds HTML + PDF + EPUB + HTML‑zip
-version: 2
-
-formats: [pdf, epub, htmlzip]
-
 build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
-  apt_packages:          # TeX for the PDF
-    - texlive-latex-recommended
-    - texlive-latex-extra
-    - texlive-fonts-recommended
-    - texlive-xetex
-    - latexmk             
+  commands:
+    - pip install -r docs/requirements.txt
+    - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
-python:
-  install:
-    - requirements: docs/requirements.txt          # Sphinx + extensions
-    - method: pip                                  # your private package
-      path: .
-      extra_requirements: [docs]                   # or omit if unused
-      url: "https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main"
+    # HTML
+    - python -m sphinx -b html   docs/source $READTHEDOCS_OUTPUT/html
 
-sphinx:
-  configuration: docs/source/conf.py
+    # PDF (LaTeX → PDF)
+    - python -m sphinx -b latex  docs/source _latex
+    - latexmk -cd -pdf -quiet -f -interaction=nonstopmode -output-directory=_latex
+    - mkdir -p $READTHEDOCS_OUTPUT/pdf
+    - cp _latex/*.pdf $READTHEDOCS_OUTPUT/pdf/coexistence-simulator.pdf
+
+    # ePub
+    - python -m sphinx -b epub   docs/source $READTHEDOCS_OUTPUT/epub
+    # HTML‑zip
+    - (cd $READTHEDOCS_OUTPUT/html && zip -r ../htmlzip/coexistence-simulator.zip .)
