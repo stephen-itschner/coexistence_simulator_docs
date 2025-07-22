@@ -36,17 +36,15 @@ def _clean(app, docname, source):
     source[0] = txt
 
 class _MathNoWrap(SphinxPostTransform):
-    """Tag every math_block with ``nowrap`` for LaTeX output.
+    """Force Sphinx to emit plain \[ ... \] for all display math."""
+    builders = ("latex",)
+    default_priority = 5
 
-    Sphinx then emits plain ``\[ … \]`` instead of ``\begin{split}``, so
-    nested ``cases`` (or other multi‑& environments) no longer trip amsmath.
-    """
-    builders = ("latex",)          # run only when producing LaTeX/PDF
-    default_priority = 5           # early, but after math nodes exist
-
-    def run(self) -> None:         # -> None keeps mypy happy
-        for node in self.document.findall(nodes.math_block):
-            node["nowrap"] = True
+    def run(self) -> None:
+        math_nodes = list(self.document.findall(nodes.math_block)) + \
+                     list(self.document.findall(nodes.math))
+        for n in math_nodes:
+            n["nowrap"] = True
 
 
 def setup(app):
