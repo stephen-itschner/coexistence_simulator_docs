@@ -37,18 +37,22 @@ def _clean(app, docname, source):
     source[0] = txt
 
 def _nowrap_all_math(app, doctree, docname):
-    """Mark every display‑math node as ``nowrap`` for LaTeX output."""
+    """Tell Sphinx‑LaTeX to typeset every display equation with ``\[ … \]``."""
     if app.builder.name != "latex":
         return
 
-    # docutils node (always available)
-    kinds = [nodes.math_block]
+    has_displaymath = hasattr(addnodes, "displaymath")
 
-    # Sphinx ≥ 2 adds its own ``displaymath`` node for numbered equations
-    if hasattr(addnodes, "displaymath"):
-        kinds.append(addnodes.displaymath)
+    def is_math(node):
+        """True for docutils *or* Sphinx display‑math nodes."""
+        return (
+            isinstance(node, nodes.math_block) or
+            (has_displaymath and isinstance(node, addnodes.displaymath))
+        )
 
-    for nd in doctree.traverse(tuple(kinds)):
+    # Give traverse() a *callable*, not a tuple,
+    # so there’s no ambiguity.
+    for nd in doctree.traverse(is_math):
         nd["nowrap"] = True
 
 
