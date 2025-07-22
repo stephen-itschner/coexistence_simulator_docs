@@ -1,27 +1,24 @@
-# .readthedocs.yaml ── slim & RTD-compliant
 version: 2
 
-# extra outputs
-formats: [pdf, epub, htmlzip]
+# ✅ Enable offline formats
+formats:
+  - pdf
+  - epub
+  - htmlzip
 
-# build environment
 build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
-  apt_packages:
-    - texlive-xetex   # XeLaTeX engine for the PDF builder
-    - latexmk         # runs the LaTeX-→-PDF pass
+
   commands:
-    # docs’ own Python deps
+    # 1️⃣ Install Sphinx + extensions
     - pip install -r docs/requirements.txt
-    # your *private* library (needs GH_PAT in RTD → Admin → Environment Vars)
+    # 2️⃣ Install the private package
     - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
+    # 3️⃣ Build HTML
+    - python -m sphinx.cmd.build -b html docs/source $READTHEDOCS_OUTPUT/html
 
-# tell RTD **not** to run “pip install .” on this repo
-python:
-  install: []   # an empty list disables the default step
-
-# where Sphinx’s conf.py lives
+# Specify Sphinx configuration explicitly
 sphinx:
   configuration: docs/source/conf.py
