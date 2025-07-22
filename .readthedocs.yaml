@@ -1,33 +1,32 @@
-# .readthedocs.yaml ― RTD config: HTML + PDF + EPUB + HTML‑zip
+# .readthedocs.yaml  ── minimal but complete
 version: 2
 
-# ── 1️⃣  Extra output formats ──────────────────────────────────────────────
+# ❶  Extra artefacts you want besides ordinary HTML
 formats:
-  - pdf          # Sphinx → LaTeX → PDF (RTD will call latexmk for you)
-  - epub         # .epub ebook
-  - htmlzip      # zipped HTML
+  - pdf
+  - epub
+  - htmlzip
 
-# ── 2️⃣  Build environment ─────────────────────────────────────────────────
+# ❷  Build image – XeTeX + latexmk are the only extra APT packages needed
 build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
-
-  # Minimal LaTeX tool‑chain for XeTeX‑based PDF builds
   apt_packages:
-    - texlive-xetex   # engine + base packages
-    - latexmk         # RTD’s PDF helper calls this internally
+    - texlive-xetex     # XeLaTeX engine
+    - latexmk           # drives the LaTeX → PDF pass
+  commands:
+    # ---- Python deps for the *docs* themselves ----------------------------
+    - pip install -r docs/requirements.txt
+    # ---- Your actual library (private GitHub repo) ------------------------
+    #      • Add GH_PAT as an *Environment Variable* in RTD → Admin
+    - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
-# ── 3️⃣  Python dependencies ───────────────────────────────────────────────
+# ❸  Tell RTD **not** to run “pip install .” on this repo (it’s docs‑only)
 python:
-  install:
-    # Docs requirements (brings in Sphinx and friends)
-    - requirements: docs/requirements.txt
+  setup_py_install: false   # skip the implicit `pip install .`
+  install: []               # nothing else here; everything is in `build.commands`
 
-    # Private library under test (requires GH_PAT set in RTD → Admin → Env Vars)
-    - method: pip
-      path: "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
-
-# ── 4️⃣  Sphinx entry‑point ────────────────────────────────────────────────
+# ❹  Where your Sphinx config lives
 sphinx:
   configuration: docs/source/conf.py
