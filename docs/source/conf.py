@@ -4,6 +4,8 @@ copyright = '2025, Stephen Itschner'
 author    = 'Stephen Itschner'
 
 # ── General configuration ──────────────────────────────────────────────────
+from docutils import nodes
+from sphinx.transforms.post_transforms import SphinxPostTransform
 import re, pathlib, sys
 sys.path.insert(0, pathlib.Path(__file__).resolve().parents[2].as_posix())
 
@@ -33,12 +35,26 @@ def _clean(app, docname, source):
         txt = txt.replace(bad, good)                   # swap fancy arrows
     source[0] = txt
 
+class _MathNoWrap(SphinxPostTransform):
+    """Tag every math_block with ``nowrap`` for LaTeX output.
+
+    Sphinx then emits plain ``\[ … \]`` instead of ``\begin{split}``, so
+    nested ``cases`` (or other multi‑& environments) no longer trip amsmath.
+    """
+    builders = ("latex",)          # run only when producing LaTeX/PDF
+    default_priority = 5           # early, but after math nodes exist
+
+    def run(self) -> None:         # -> None keeps mypy happy
+        for node in self.document.findall(nodes.math_block):
+            node["nowrap"] = True
+
+
 def setup(app):
     app.connect("source-read", _clean)
+    app.add_post_transform(_MathNoWrap)
 
 # ── 2. LaTeX / PDF tweaks (TeX side) ───────────────────────────────────────
 latex_engine = "xelatex"
-latex_wrap_equations = 'equation'
 
 latex_elements = {
     "preamble": r"""
