@@ -1,35 +1,33 @@
-# .readthedocs.yaml ── streamlined for RTD
+# .readthedocs.yaml ― RTD config: HTML + PDF + EPUB + HTML‑zip
 version: 2
 
-# 1️⃣  Tell RTD which extra output formats you want
+# ── 1️⃣  Extra output formats ──────────────────────────────────────────────
 formats:
-  - pdf          # Sphinx → LaTeX → PDF (uses latexmk for you)
-  - epub
-  - htmlzip
+  - pdf          # Sphinx → LaTeX → PDF (RTD will call latexmk for you)
+  - epub         # .epub ebook
+  - htmlzip      # zipped HTML
 
-# 2️⃣  Build environment
+# ── 2️⃣  Build environment ─────────────────────────────────────────────────
 build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
 
-  # LaTeX needs XeTeX and latexmk; everything else comes with RTD’s base image
+  # Minimal LaTeX tool‑chain for XeTeX‑based PDF builds
   apt_packages:
-    - texlive-xetex
-    - latexmk
+    - texlive-xetex   # engine + base packages
+    - latexmk         # RTD’s PDF helper calls this internally
 
-# 3️⃣  Python dependencies (RTD will run these for you)
+# ── 3️⃣  Python dependencies ───────────────────────────────────────────────
 python:
   install:
-    # project itself (the repo being built):
-    - method: pip
-      path: .
-    # requirements the docs need:
+    # Docs requirements (brings in Sphinx and friends)
     - requirements: docs/requirements.txt
-    # private GitHub package (make sure GH_PAT is set in RTD → Admin → Environment Variables)
+
+    # Private library under test (requires GH_PAT set in RTD → Admin → Env Vars)
     - method: pip
       path: "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
-# 4️⃣  Sphinx entry‑point
+# ── 4️⃣  Sphinx entry‑point ────────────────────────────────────────────────
 sphinx:
   configuration: docs/source/conf.py
