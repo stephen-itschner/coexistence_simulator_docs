@@ -1,6 +1,6 @@
 version: 2
 
-formats:        # make the “Download” menu appear
+formats:
   - pdf
   - epub
   - htmlzip
@@ -10,27 +10,31 @@ build:
   tools:
     python: "3.12"
 
-  apt_packages:           # XeLaTeX & friends
+  apt_packages:
+    # XeLaTeX & friends
     - texlive-xetex
     - texlive-latex-recommended
     - texlive-latex-extra
     - texlive-fonts-recommended
+    - texlive-xindy          # NEW — fixes the indexing crash
+    - texlive-lang-european  # NEW — provides LATIN9‑LANG.XDY etc.
     - latexmk
+    - fonts-dejavu           # wide Unicode coverage (optional)
 
   commands:
-    # 1️⃣  Python deps
+    # 1️⃣  Python dependencies
     - pip install -r docs/requirements.txt
 
-    # 2️⃣  Private package (needs GH_PAT secret in RTD admin)
+    # 2️⃣  Private package
     - pip install "git+https://${GH_PAT}@github.com/stephen-itschner/coexistence_simulator.git@main#egg=coexistence_simulator"
 
     # 3️⃣  HTML
     - python -m sphinx.cmd.build -b html docs/source $READTHEDOCS_OUTPUT/html
 
-    # 4️⃣  LaTeX source with XeLaTeX engine
+    # 4️⃣  LaTeX sources (XeLaTeX engine)
     - python -m sphinx.cmd.build -b latex -D latex_engine=xelatex docs/source $READTHEDOCS_OUTPUT/latex
 
-    # 5️⃣  PDF via latexmk + XeLaTeX
+    # 5️⃣  PDF via latexmk + XeLaTeX (+ xindy now available)
     - |
       cd $READTHEDOCS_OUTPUT/latex && \
       latexmk -quiet -xelatex -f coexistencesimulator.tex
