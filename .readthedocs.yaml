@@ -28,7 +28,7 @@ build:
     - python -m sphinx -b html docs/source $READTHEDOCS_OUTPUT/html
 
     # 4️⃣  Build LaTeX sources **without xindy**
-    - python -m sphinx -b latex -D latex_engine=xelatex -D latex_use_xindy=false docs/source $READTHEDOCS_OUTPUT/latex
+    - python -m sphinx -b latex -D latex_engine=xelatex -D latex_use_xindy=0 docs/source $READTHEDOCS_OUTPUT/latex
 
     # 5️⃣  Turn LaTeX into PDF
     - cd $READTHEDOCS_OUTPUT/latex && latexmk -quiet -xelatex -f coexistencesimulator.tex
