@@ -38,6 +38,7 @@ def setup(app):
 
 # ── 2. LaTeX / PDF tweaks (TeX side) ───────────────────────────────────────
 latex_engine = "xelatex"
+latex_wrap_equations = 'equation'
 
 latex_elements = {
     "preamble": r"""
