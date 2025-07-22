@@ -5,6 +5,7 @@ author    = 'Stephen Itschner'
 
 # ── General configuration ──────────────────────────────────────────────────
 from docutils import nodes
+from sphinx import addnodes
 from sphinx.transforms.post_transforms import SphinxPostTransform
 import re, pathlib, sys
 sys.path.insert(0, pathlib.Path(__file__).resolve().parents[2].as_posix())
@@ -35,21 +36,17 @@ def _clean(app, docname, source):
         txt = txt.replace(bad, good)                   # swap fancy arrows
     source[0] = txt
 
-class _MathNoWrap(SphinxPostTransform):
-    """Force Sphinx to emit plain \[ ... \] for all display math."""
-    builders = ("latex",)
-    default_priority = 5
-
-    def run(self) -> None:
-        math_nodes = list(self.document.findall(nodes.math_block)) + \
-                     list(self.document.findall(nodes.math))
-        for n in math_nodes:
-            n["nowrap"] = True
+def _nowrap_all_math(app, doctree, docname):
+    """Mark every display‑math node as *nowrap* for LaTeX output."""
+    if app.builder.name != "latex":
+        return
+    for nd in doctree.traverse((nodes.math_block, addnodes.math_block)):
+        nd["nowrap"] = True
 
 
 def setup(app):
     app.connect("source-read", _clean)
-    app.add_post_transform(_MathNoWrap)
+    app.connect("doctree-resolved", _nowrap_all_math)
 
 # ── 2. LaTeX / PDF tweaks (TeX side) ───────────────────────────────────────
 latex_engine = "xelatex"
